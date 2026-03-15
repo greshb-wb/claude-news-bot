@@ -1,29 +1,9 @@
 import Parser from "rss-parser";
-import fs from "fs";
-import path from "path";
 import { config } from "./config";
 
 const parser = new Parser();
-
-// --- State persistence (track which tweets we've already posted) ---
-
-function loadPosted(): Set<string> {
-  try {
-    const dir = path.dirname(config.stateFile);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    if (!fs.existsSync(config.stateFile)) return new Set();
-    const data = JSON.parse(fs.readFileSync(config.stateFile, "utf-8"));
-    return new Set(data);
-  } catch {
-    return new Set();
-  }
-}
-
-function savePosted(posted: Set<string>): void {
-  const dir = path.dirname(config.stateFile);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(config.stateFile, JSON.stringify([...posted]));
-}
+const startedAt = new Date();
+const posted = new Set<string>();
 
 // --- Slack ---
 
@@ -66,7 +46,6 @@ async function postToSlack(text: string, link: string): Promise<void> {
 async function poll(): Promise<void> {
   console.log(`[${new Date().toISOString()}] Polling ${config.rssFeedUrl}`);
 
-  const posted = loadPosted();
   let feed;
 
   try {
@@ -84,6 +63,13 @@ async function poll(): Promise<void> {
     const id = item.guid || item.link || item.title || "";
     if (!id || posted.has(id)) continue;
 
+    // Skip items published before the bot came online
+    const pubDate = item.pubDate ? new Date(item.pubDate) : null;
+    if (!pubDate || pubDate < startedAt) {
+      posted.add(id);
+      continue;
+    }
+
     const text = item.contentSnippet || item.title || "(no content)";
     const link = item.link || `https://x.com/ClaudeAI`;
 
@@ -97,13 +83,43 @@ async function poll(): Promise<void> {
     }
   }
 
-  savePosted(posted);
   console.log(`  ${newCount} new tweet(s) posted, ${posted.size} total tracked.`);
 }
 
 // --- Entry point ---
 
+let polling = false;
+let shuttingDown = false;
+let timer: ReturnType<typeof setTimeout> | null = null;
+
+async function scheduledPoll(): Promise<void> {
+  if (polling || shuttingDown) return;
+  polling = true;
+  try {
+    await poll();
+  } finally {
+    polling = false;
+    if (!shuttingDown) {
+      timer = setTimeout(scheduledPoll, config.pollInterval * 1000);
+    }
+  }
+}
+
+function shutdown(signal: string): void {
+  console.log(`\n${signal} received, shutting down gracefully...`);
+  shuttingDown = true;
+  if (timer) clearTimeout(timer);
+  if (!polling) process.exit(0);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
 async function main(): Promise<void> {
+  if (!config.rssFeedUrl) {
+    console.error("RSS_FEED_URL is required. Set it as an environment variable.");
+    process.exit(1);
+  }
   if (!config.slackWebhookUrl) {
     console.error("SLACK_WEBHOOK_URL is required. Set it as an environment variable.");
     process.exit(1);
@@ -113,11 +129,7 @@ async function main(): Promise<void> {
   console.log(`  Feed:     ${config.rssFeedUrl}`);
   console.log(`  Interval: ${config.pollInterval}s`);
 
-  // Initial poll
-  await poll();
-
-  // Schedule recurring polls
-  setInterval(poll, config.pollInterval * 1000);
+  await scheduledPoll();
 }
 
 main();
