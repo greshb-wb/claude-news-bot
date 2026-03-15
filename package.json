@@ -1,0 +1,20 @@
+{
+  "name": "claude-news-bot",
+  "version": "1.0.0",
+  "description": "Posts @ClaudeAI tweets to Slack",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/xml2js": "^0.4.14",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

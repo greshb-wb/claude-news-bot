@@ -1,0 +1,14 @@
+services:
+  claude-news-bot:
+    build: .
+    restart: unless-stopped
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      # Optional overrides:
+      # - RSS_FEED_URL=https://rsshub.app/twitter/user/ClaudeAI
+      # - POLL_INTERVAL=300
+    volumes:
+      - bot-data:/data
+
+volumes:
+  bot-data:
