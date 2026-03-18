@@ -69,3 +69,6 @@ Requires Node 20+.
 npm install
 npm run dev
 ```
+
+<img width="907" height="507" alt="Screenshot 2026-03-18 at 1 15 27 PM" src="https://github.com/user-attachments/assets/babbe2a0-9c2a-4b29-8965-9df1a9e6411a" />
+
