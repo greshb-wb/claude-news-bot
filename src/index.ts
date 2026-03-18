@@ -9,6 +9,7 @@ const posted = new Set<string>();
 
 async function postToSlack(text: string, link: string): Promise<void> {
   const payload = {
+    text: link,
     blocks: [
       {
         type: "section",
@@ -70,7 +71,10 @@ async function poll(): Promise<void> {
       continue;
     }
 
-    const text = item.contentSnippet || item.title || "(no content)";
+    const text = (item.contentSnippet || item.title || "(no content)")
+      .replace(/\n(Video|Photo|GIF)\n/g, "\n")
+      .replace(/\n(Video|Photo|GIF)$/g, "")
+      .trim();
     const link = item.link || `https://x.com/ClaudeAI`;
 
     try {
